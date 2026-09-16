@@ -75,7 +75,7 @@ Measured over the first quarter post-launch:
 - In-app payments, credit card capture, or any payment gateway integration in the Player App (monetization is ad-only, see §4).
 - Player accounts, login, or player-submitted data of any kind — the app is strictly read-only.
 - AI- or agent-driven dispute resolution or bracket adjudication — all scheduling logic is deterministic (see §3).
-- Multi-organizer / team-based back-office permissions beyond a single organizer account per league (roles/permissions are a post-MVP consideration).
+- Multi-organizer / multi-admin back-office access — MVP ships with a single organizer account per league. Multiple "league admin" seats with realtime concurrent editing are planned for v1.1, not MVP (see Post-MVP Roadmap, §6).
 - Native push notifications (real-time in-app updates via Supabase Realtime are in scope; OS-level push is not).
 
 ---
@@ -91,7 +91,7 @@ Measured over the first quarter post-launch:
 ### Architecture Overview
 
 - **Back Office client:** Nuxt (Vue 3) web application — organizer-facing dashboard, tournament creation wizard, venue management, draft review UI.
-- **Server layer:** Nuxt Nitro server routes, colocated with the Nuxt app, exposing the API the Back Office and (read-only) Player App consume. Long-running bracket generation runs as a background worker job rather than inline in a request handler, so a large Swiss field never blocks or times out the HTTP request (see Risk: scheduling complexity, §5).
+- **Server layer:** Nuxt Nitro server routes, colocated with the Nuxt app, exposing the API the Back Office and (read-only) Player App consume. Long-running bracket generation runs as a background worker job rather than inline in a request handler, so a large Swiss field never blocks or times out the HTTP request (see Risk: scheduling complexity, §6).
 - **Data layer:** Supabase (managed PostgreSQL). Chosen for the deeply relational entity model this product needs — Leagues, Tournaments, Venues, Teams, Players, Matches — plus built-in Realtime (Postgres change-data-capture over websockets) to push bracket and news-bulletin updates to the Player App without polling, and built-in Auth for the organizer side.
 - **State/versioning model:** Bracket generation writes to a `draft` state distinct from the `published` state. An organizer's manual overrides mutate the draft; publish is a single transactional commit that promotes the draft to the live, player-visible schedule. This is a data-model concern (a `status` column plus a `draft_matches` vs. `matches` distinction, or an append-only `bracket_versions` table), not a separate service.
 - **Player App client:** Flutter (iOS + Android from one codebase), consuming the Nitro read-only API and subscribing to Supabase Realtime channels for live bracket/news updates.
@@ -100,7 +100,7 @@ Measured over the first quarter post-launch:
 
 - **Auth:** Supabase Auth, email/password with magic-link sign-in, for organizer accounts only. The Player App has no auth integration point — every endpoint it calls is public-read, scoped to published (never draft) tournament data.
 - **Realtime updates:** Supabase Realtime, subscribed from the Flutter app to the tournament/league channels the player is currently viewing.
-- **Time zones:** All venue operating hours and match timestamps are stored in UTC with an IANA time zone identifier per venue; conversion to local display time happens at the client. This is a data-modeling and library concern (e.g., a mature IANA-timezone-aware date library on both the Nitro/Node side and the Flutter side), not a hosted service — no external timezone API is required.
+- **Time zones:** All venue operating hours and match timestamps are stored in UTC with an IANA time zone identifier per venue; conversion to local display time happens at the client. No external timezone API is required — this is a library concern on each client: **Luxon** on the Nitro/Node side (the standard IANA-timezone-aware date library in that ecosystem, used for all server-side scheduling math) and the **`timezone`** Dart package paired with **`flutter_timezone`** (device timezone detection) on the Flutter side, for local-time display only.
 - **Advertising:** Google AdMob via its official Flutter plugin, for sponsor ad placement in the Player App. No custom ad server for MVP.
 - **Payments:** None. Explicitly out of scope for MVP (see Non-Goals).
 
@@ -109,11 +109,37 @@ Measured over the first quarter post-launch:
 - Player App collects no PII and requires no account — players are identified only by the display name/roster data the organizer enters in the Back Office, which is intentionally public within the league (this is the product: public brackets and public historical results).
 - Organizer accounts (email, auth credentials) are the only PII in the system, held by Supabase Auth; standard practice applies (hashed/managed by Supabase, never stored in plaintext by ILEAGUE's own code).
 - Draft-state bracket data is only readable by the authenticated organizer who owns the tournament — the public read API only ever serves `published` data, enforced via Postgres Row Level Security policies, not application-layer checks alone.
-- Historical match results persist indefinitely by design (this is a stated product feature — see Acceptance Criteria) and are not subject to a deletion/retention policy in MVP; a future GDPR-style data-deletion request from an organizer is a post-MVP consideration to revisit if/when the product handles EU organizer accounts.
+- **Data retention policy (formal, in effect from MVP):**
+  - **Player/match data** (display names, results, standings, historical bracket data): retained indefinitely by design — this is the product's core value ("preserve historical records"). Not personal data under GDPR in the ordinary case (no account, no contact info, no way to link a display name back to a real identity through ILEAGUE), so it is not subject to erasure-request handling. An organizer can still request removal of a specific league's public data via support; fulfilled within 30 days, same SLA as below.
+  - **Organizer account data** (email, auth credentials, billing info once tiers ship): retained for the lifetime of the account. On account deletion request, PII is purged from primary tables within 30 days. The organizer's published league/tournament data is *not* auto-deleted with the account (it stays live per the point above) unless the organizer explicitly requests full league removal in the same request.
+  - **Backups:** deleted records can persist in Supabase's point-in-time-recovery window after primary-table deletion — currently up to 14 days on a Pro-tier project (Supabase's standard PITR retention) — before they age out of every backup copy. This window is disclosed as-is rather than promised away; a request "purge from backups immediately" is not technically offered in MVP.
+  - **Right-to-erasure posture:** built in from MVP even though the product doesn't yet target EU organizers specifically — cheaper to have the 30-day SLA and support-request flow in place now than to retrofit it once the org has EU customers.
 
 ---
 
-## 5. Risks & Roadmap
+## 5. Pricing & Monetization
+
+Three tiers: one free, two paid. Tier boundaries are drawn on scale (tournaments/venues/players), collaboration (admin seats — see §6 v1.1), and branding/support, never on the core scheduling engine itself — Single Elimination and Swiss stay available at every tier, because gatekeeping the product's actual differentiator behind a paywall undermines the adoption thesis in §1. Dollar figures below are a starting proposal to validate against willingness-to-pay research before launch, not a committed price list — flagged explicitly rather than presented as decided.
+
+| | **Free — Community** | **Organizer** (proposed ~$19–29/mo) | **League / Pro** (proposed ~$49–79/mo) |
+|---|---|---|---|
+| Concurrent active tournaments | 1 | 3 | Unlimited |
+| Venues per tournament | 1 | 3 | Unlimited |
+| Players per tournament | Up to 32 | Up to 128 | Unlimited |
+| Tournament formats | Single Elim + Swiss | Single Elim + Swiss | Single Elim + Swiss |
+| League admin seats | 1 (owner only) | Up to 3, realtime concurrent editing (v1.1) | Unlimited, role-based permissions (v2.0) |
+| Historical data retention | 90 days post-tournament (see retention policy, §4) | Indefinite | Indefinite + CSV/data export |
+| Back Office branding | ILEAGUE branding shown | ILEAGUE branding removed | Custom league logo/branding |
+| Player App sponsor ads | Shown (default monetization) | Shown | Optional reduced/ad-light experience |
+| Support | Community/self-serve | Priority email | Priority email, faster SLA |
+
+Rationale for the free tier's shape: it must be genuinely usable for a real one-off community event (the exact scenario in §2's primary persona — one main venue plus no overflow space) so it drives the adoption the success metrics in §1 depend on, while the multi-venue/multi-admin/scale needs of a recurring league organizer are the natural, non-arbitrary upgrade trigger.
+
+Open pricing questions for Ian to validate before launch: exact dollar amounts (competitor pricing for Challonge/Toornament/Battlefy wasn't publicly available at time of writing — worth a direct pricing-page check before committing), and whether billing is per-month or per-event (a seasonal/community organizer running one league a year may prefer per-event pricing over a recurring subscription).
+
+---
+
+## 6. Risks & Roadmap
 
 ### Phased Rollout
 
@@ -122,6 +148,11 @@ No fixed calendar deadline for MVP — priority is correctness of the scheduling
 - **Phase 1 — Backend Architecture & Nuxt Dashboard.** Supabase schema (Leagues, Tournaments, Venues, Teams, Players, Matches, draft/published state), Nitro API routes, organizer auth, tournament creation wizard, and the scheduling engine itself. **Milestone:** generate a 64-player Swiss bracket across 3 simulated venues with zero scheduling collisions, verified by the automated conflict-detector, in under 10 seconds.
 - **Phase 2 — Mobile Client & API Exposure.** Flutter Player App, read-only API surface, Supabase Realtime subscriptions, AdMob integration. **Milestone:** a published multi-venue bracket renders live on both iOS and Android with bracket/news updates visible within 2 seconds of the organizer's publish action.
 - **Phase 3 — UAT & End-to-End Testing.** Simulated live tournament exercising manual overrides, bracket progression, draft-to-publish flow, and mobile ad display concurrently. **Milestone:** a full simulated event runs start to finish with zero unresolved scheduling conflicts and zero manual-override actions lost or misapplied.
+
+### Post-MVP Roadmap
+
+- **v1.1 — Multi-admin leagues.** Multiple "league admin" seats per league (Organizer/League tiers, §5) with realtime concurrent editing of tournament/venue data. Concurrency safety extends the existing NFR that concurrent bracket updates process in under 2 seconds to prevent data collision (§2): each write carries an optimistic-concurrency version check, and the Back Office surfaces a live presence indicator (who else is viewing/editing this tournament right now) so two admins don't blind-write over each other's changes.
+- **v2.0 — Scale and format expansion.** Double Elimination and Round Robin formats; role-based admin permissions (e.g., full admin vs. scorekeeper-only); evaluate payment-gateway integration if organizer demand emerges for in-app entry-fee collection (still explicitly out of MVP scope, §2).
 
 ### Technical Risks
 
@@ -136,7 +167,7 @@ No fixed calendar deadline for MVP — priority is correctness of the scheduling
 
 ## Open Items (explicitly deferred, not blocking MVP build)
 
-- Multi-organizer roles/permissions model — single organizer-per-league is sufficient for MVP.
-- Formal data-retention/deletion policy for organizer PII if the product later serves EU-based organizers.
-- Choice of specific IANA-timezone-aware date library for the Nitro/Node and Flutter sides — pick during Phase 1 implementation, not a product-requirements decision.
-- Budget/cost ceiling — not yet specified. Relevant before committing to paid tiers (Supabase usage-based pricing past free tier, AdMob account setup, any CI/hosting spend). Flag before Phase 1 infra decisions lock in.
+- **Budget/cost ceiling** — not yet specified. Relevant before committing to paid infra tiers (Supabase usage past free tier, AdMob account setup, any CI/hosting spend). Flag before Phase 1 infra decisions lock in.
+- **Hosting region** for Supabase project — not yet specified; pick based on where the first organizers/venues actually are once that's known.
+- **Exact pricing tier dollar amounts** (§5) — proposed ranges only, need validation against actual competitor pricing pages and/or direct organizer willingness-to-pay conversations before launch.
+- **Billing model** (recurring monthly subscription vs. per-event/per-tournament pricing) — flagged as an open question in §5, relevant given how seasonal some community organizers' event cadence is.
