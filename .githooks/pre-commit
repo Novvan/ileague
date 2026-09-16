@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+#
+# .githooks/pre-commit
+#
+# Local lint/format/typecheck gate, scoped to only the staged files' owning
+# service/area -- mirrors E1-T2's CI path filtering so "passing" means the
+# same thing locally and in CI (a diff confined to one service never runs
+# another service's checks).
+#
+# One-time setup (per clone): git config core.hooksPath .githooks
+# Details: docs/HOOKS.md
+#
+# Emergency bypass: git commit --no-verify
+# This script never skips a check silently on its own -- every skip prints
+# why, below. --no-verify is the only way around it, and invoking it is
+# yours to do, not this script's.
+
+set -euo pipefail
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -z "$STAGED_FILES" ]; then
+  exit 0
+fi
+
+# Owning areas this hook knows how to scope, root-relative. Matched by path
+# prefix; anything staged outside all of these falls into "other" and is
+# still reported, never silently ignored.
+AREAS="services/supabase-infra services/scheduling-engine services/back-office services/player-app contracts"
+
+OVERALL_EXIT=0
+
+# check_and_run_area <path> <label>
+#
+# Detects whatever lint/format/typecheck tooling <path> has configured today
+# and runs it. Nothing is hardcoded to "no tooling yet" -- once a later epic
+# drops a package.json with a "lint"/"typecheck" script, or a pubspec.yaml,
+# into one of these areas, this function picks it up on the next commit
+# without the hook itself needing to change.
+check_and_run_area() {
+  local path="$1"
+  local label="$2"
+  local ran=0
+
+  # Node-based tooling (Nuxt back-office, a contracts package, scheduling-engine
+  # if it ships package.json scripts, etc.)
+  local pkg="$path/package.json"
+  if [ -f "$pkg" ]; then
+    local script
+    for script in lint typecheck; do
+      if grep -Eq "\"$script\"[[:space:]]*:" "$pkg"; then
+        ran=1
+        echo "$label: running npm run $script"
+        if ! (cd "$path" && npm run --silent "$script"); then
+          echo "$label: npm run $script FAILED"
+          OVERALL_EXIT=1
+        fi
+      fi
+    done
+  fi
+
+  # Flutter tooling (player-app)
+  local pubspec="$path/pubspec.yaml"
+  if [ -f "$pubspec" ]; then
+    ran=1
+    echo "$label: running flutter analyze"
+    if ! (cd "$path" && flutter analyze); then
+      echo "$label: flutter analyze FAILED"
+      OVERALL_EXIT=1
+    fi
+  fi
+
+  if [ "$ran" -eq 0 ]; then
+    echo "$label: staged changes, no lint tooling configured yet -- skipping"
+  fi
+}
+
+# --- figure out which known areas have staged changes ---------------------
+
+touched_areas=""
+other_touched=0
+
+while IFS= read -r file; do
+  [ -z "$file" ] && continue
+  matched=0
+  for area in $AREAS; do
+    case "$file" in
+      "$area"/*)
+        case " $touched_areas " in
+          *" $area "*) ;; # already recorded
+          *) touched_areas="$touched_areas $area" ;;
+        esac
+        matched=1
+        break
+        ;;
+    esac
+  done
+  [ "$matched" -eq 0 ] && other_touched=1
+done <<< "$STAGED_FILES"
+
+# --- run each touched area's tooling (or report it has none yet) ----------
+
+for area in $touched_areas; do
+  check_and_run_area "$area" "$area"
+done
+
+if [ "$other_touched" -eq 1 ]; then
+  check_and_run_area "." "other (repo root / outside services & contracts)"
+fi
+
+exit $OVERALL_EXIT
