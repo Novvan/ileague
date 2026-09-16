@@ -1,5 +1,8 @@
 name: CI - back-office
 
+permissions:
+  contents: read
+
 on:
   push:
     paths:
@@ -25,6 +28,14 @@ jobs:
             echo "found=true" >> "$GITHUB_OUTPUT"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify lockfile present
+        if: steps.detect.outputs.found == 'true'
+        run: |
+          if [ ! -f "services/back-office/package-lock.json" ]; then
+            echo "::error::services/back-office/package.json exists but package-lock.json is missing. npm ci requires a committed lockfile - run 'npm install' locally and commit the result."
+            exit 1
           fi
 
       - name: Set up Node.js

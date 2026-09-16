@@ -1,5 +1,8 @@
 name: CI - player-app
 
+permissions:
+  contents: read
+
 on:
   push:
     paths:
