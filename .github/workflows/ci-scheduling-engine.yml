@@ -24,37 +24,23 @@ jobs:
       - name: Detect test tooling
         id: detect
         run: |
-          if [ -f "services/scheduling-engine/package.json" ]; then
+          if [ -f "services/scheduling-engine/deno.json" ] || [ -f "services/scheduling-engine/deno.jsonc" ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Verify lockfile present
+      - name: Set up Deno
         if: steps.detect.outputs.found == 'true'
-        run: |
-          if [ ! -f "services/scheduling-engine/package-lock.json" ]; then
-            echo "::error::services/scheduling-engine/package.json exists but package-lock.json is missing. npm ci requires a committed lockfile - run 'npm install' locally and commit the result."
-            exit 1
-          fi
-
-      - name: Set up Node.js
-        if: steps.detect.outputs.found == 'true'
-        uses: actions/setup-node@v4
+        uses: denoland/setup-deno@v2
         with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: services/scheduling-engine/package-lock.json
-
-      - name: Install dependencies
-        if: steps.detect.outputs.found == 'true'
-        working-directory: services/scheduling-engine
-        run: npm ci
+          deno-version: lts
+          cache: true
 
       - name: Run tests
         if: steps.detect.outputs.found == 'true'
         working-directory: services/scheduling-engine
-        run: npm test
+        run: deno test -A
 
       - name: No test tooling configured yet
         if: steps.detect.outputs.found == 'false'
