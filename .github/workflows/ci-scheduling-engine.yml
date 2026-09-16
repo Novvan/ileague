@@ -1,0 +1,50 @@
+name: CI - scheduling-engine
+
+on:
+  push:
+    paths:
+      - 'services/scheduling-engine/**'
+      - 'contracts/**'
+  pull_request:
+    paths:
+      - 'services/scheduling-engine/**'
+      - 'contracts/**'
+
+jobs:
+  test:
+    name: scheduling-engine tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect test tooling
+        id: detect
+        run: |
+          if [ -f "services/scheduling-engine/package.json" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js
+        if: steps.detect.outputs.found == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: services/scheduling-engine/package-lock.json
+
+      - name: Install dependencies
+        if: steps.detect.outputs.found == 'true'
+        working-directory: services/scheduling-engine
+        run: npm ci
+
+      - name: Run tests
+        if: steps.detect.outputs.found == 'true'
+        working-directory: services/scheduling-engine
+        run: npm test
+
+      - name: No test tooling configured yet
+        if: steps.detect.outputs.found == 'false'
+        run: echo "no test tooling configured yet for scheduling-engine - skipping"

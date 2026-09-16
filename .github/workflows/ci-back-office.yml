@@ -1,0 +1,50 @@
+name: CI - back-office
+
+on:
+  push:
+    paths:
+      - 'services/back-office/**'
+      - 'contracts/**'
+  pull_request:
+    paths:
+      - 'services/back-office/**'
+      - 'contracts/**'
+
+jobs:
+  test:
+    name: back-office tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect test tooling
+        id: detect
+        run: |
+          if [ -f "services/back-office/package.json" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js
+        if: steps.detect.outputs.found == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: services/back-office/package-lock.json
+
+      - name: Install dependencies
+        if: steps.detect.outputs.found == 'true'
+        working-directory: services/back-office
+        run: npm ci
+
+      - name: Run tests
+        if: steps.detect.outputs.found == 'true'
+        working-directory: services/back-office
+        run: npm test
+
+      - name: No test tooling configured yet
+        if: steps.detect.outputs.found == 'false'
+        run: echo "no test tooling configured yet for back-office - skipping"

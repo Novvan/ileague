@@ -1,0 +1,48 @@
+name: CI - player-app
+
+on:
+  push:
+    paths:
+      - 'services/player-app/**'
+      - 'contracts/**'
+  pull_request:
+    paths:
+      - 'services/player-app/**'
+      - 'contracts/**'
+
+jobs:
+  test:
+    name: player-app tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect test tooling
+        id: detect
+        run: |
+          if [ -f "services/player-app/pubspec.yaml" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Flutter
+        if: steps.detect.outputs.found == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        if: steps.detect.outputs.found == 'true'
+        working-directory: services/player-app
+        run: flutter pub get
+
+      - name: Run tests
+        if: steps.detect.outputs.found == 'true'
+        working-directory: services/player-app
+        run: flutter test
+
+      - name: No test tooling configured yet
+        if: steps.detect.outputs.found == 'false'
+        run: echo "no test tooling configured yet for player-app - skipping"
