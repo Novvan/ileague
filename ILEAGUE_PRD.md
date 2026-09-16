@@ -1,6 +1,6 @@
 # Product Requirements Document: ILEAGUE
 
-**Status:** Draft v2 — MVP scope
+**Status:** Draft v3 — MVP scope, pricing finalized
 **Owner:** Ian Geier
 **Last updated:** 2026-09-16
 
@@ -92,7 +92,7 @@ Measured over the first quarter post-launch:
 
 - **Back Office client:** Nuxt (Vue 3) web application — organizer-facing dashboard, tournament creation wizard, venue management, draft review UI.
 - **Server layer:** Nuxt Nitro server routes, colocated with the Nuxt app, exposing the API the Back Office and (read-only) Player App consume. Long-running bracket generation runs as a background worker job rather than inline in a request handler, so a large Swiss field never blocks or times out the HTTP request (see Risk: scheduling complexity, §6).
-- **Data layer:** Supabase (managed PostgreSQL). Chosen for the deeply relational entity model this product needs — Leagues, Tournaments, Venues, Teams, Players, Matches — plus built-in Realtime (Postgres change-data-capture over websockets) to push bracket and news-bulletin updates to the Player App without polling, and built-in Auth for the organizer side.
+- **Data layer:** Supabase (managed PostgreSQL), project hosted in the **São Paulo (`sa-east-1`)** region. Chosen for the deeply relational entity model this product needs — Leagues, Tournaments, Venues, Teams, Players, Matches — plus built-in Realtime (Postgres change-data-capture over websockets) to push bracket and news-bulletin updates to the Player App without polling, and built-in Auth for the organizer side.
 - **State/versioning model:** Bracket generation writes to a `draft` state distinct from the `published` state. An organizer's manual overrides mutate the draft; publish is a single transactional commit that promotes the draft to the live, player-visible schedule. This is a data-model concern (a `status` column plus a `draft_matches` vs. `matches` distinction, or an append-only `bracket_versions` table), not a separate service.
 - **Player App client:** Flutter (iOS + Android from one codebase), consuming the Nitro read-only API and subscribing to Supabase Realtime channels for live bracket/news updates.
 
@@ -119,23 +119,23 @@ Measured over the first quarter post-launch:
 
 ## 5. Pricing & Monetization
 
-Three tiers: one free, two paid. Tier boundaries are drawn on scale (tournaments/venues/players), collaboration (admin seats — see §6 v1.1), and branding/support, never on the core scheduling engine itself — Single Elimination and Swiss stay available at every tier, because gatekeeping the product's actual differentiator behind a paywall undermines the adoption thesis in §1. Dollar figures below are a starting proposal to validate against willingness-to-pay research before launch, not a committed price list — flagged explicitly rather than presented as decided.
+Three tiers: one free, two paid, billed monthly (no per-event option). Tier boundaries are drawn on scale (tournaments/venues/players), collaboration (admin seats — see §6 v1.1), and support, never on the scheduling engine or tournament formats themselves — every tier gets the same format support, because gatekeeping the product's actual differentiator behind a paywall undermines the adoption thesis in §1.
 
-| | **Free — Community** | **Organizer** (proposed ~$19–29/mo) | **League / Pro** (proposed ~$49–79/mo) |
+| | **Free — Community** | **Organizer** ($20/mo) | **League / Pro** ($50/mo) |
 |---|---|---|---|
 | Concurrent active tournaments | 1 | 3 | Unlimited |
-| Venues per tournament | 1 | 3 | Unlimited |
+| Venues per tournament | 2 | 5 | Unlimited |
 | Players per tournament | Up to 32 | Up to 128 | Unlimited |
-| Tournament formats | Single Elim + Swiss | Single Elim + Swiss | Single Elim + Swiss |
+| Tournament formats | All | All | All |
 | League admin seats | 1 (owner only) | Up to 3, realtime concurrent editing (v1.1) | Unlimited, role-based permissions (v2.0) |
 | Historical data retention | 90 days post-tournament (see retention policy, §4) | Indefinite | Indefinite + CSV/data export |
-| Back Office branding | ILEAGUE branding shown | ILEAGUE branding removed | Custom league logo/branding |
-| Player App sponsor ads | Shown (default monetization) | Shown | Optional reduced/ad-light experience |
+| Back Office branding | ILEAGUE branding shown | ILEAGUE branding shown | Custom league logo/branding |
+| Player App sponsor ads | Shown (default monetization) | Shown | Shown |
 | Support | Community/self-serve | Priority email | Priority email, faster SLA |
 
-Rationale for the free tier's shape: it must be genuinely usable for a real one-off community event (the exact scenario in §2's primary persona — one main venue plus no overflow space) so it drives the adoption the success metrics in §1 depend on, while the multi-venue/multi-admin/scale needs of a recurring league organizer are the natural, non-arbitrary upgrade trigger.
+*"Tournament formats: All" means every format ILEAGUE supports at the time, currently Single Elimination and Swiss (MVP) — not a promise of Double Elimination/Round Robin ahead of the v2.0 roadmap in §6; formats simply aren't a tier-gating axis.*
 
-Open pricing questions for Ian to validate before launch: exact dollar amounts (competitor pricing for Challonge/Toornament/Battlefy wasn't publicly available at time of writing — worth a direct pricing-page check before committing), and whether billing is per-month or per-event (a seasonal/community organizer running one league a year may prefer per-event pricing over a recurring subscription).
+Rationale for the free tier's shape: 2 venues at no cost means the free tier already covers the exact scenario in §2's primary persona — a main venue plus an overflow space — so the headline use case this PRD opens with is fully free-tier-eligible, which is what the adoption thesis in §1 depends on. The upgrade trigger for a recurring organizer is scale (more concurrent tournaments, more players, more venues) and collaboration (multiple league admins, v1.1), not access to the core product.
 
 ---
 
@@ -168,6 +168,3 @@ No fixed calendar deadline for MVP — priority is correctness of the scheduling
 ## Open Items (explicitly deferred, not blocking MVP build)
 
 - **Budget/cost ceiling** — not yet specified. Relevant before committing to paid infra tiers (Supabase usage past free tier, AdMob account setup, any CI/hosting spend). Flag before Phase 1 infra decisions lock in.
-- **Hosting region** for Supabase project — not yet specified; pick based on where the first organizers/venues actually are once that's known.
-- **Exact pricing tier dollar amounts** (§5) — proposed ranges only, need validation against actual competitor pricing pages and/or direct organizer willingness-to-pay conversations before launch.
-- **Billing model** (recurring monthly subscription vs. per-event/per-tournament pricing) — flagged as an open question in §5, relevant given how seasonal some community organizers' event cadence is.
