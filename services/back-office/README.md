@@ -23,3 +23,18 @@ Deployed to Vercel Hobby (free tier) during the testing phase — see the PRD's 
 ## Where to start
 
 `implementationPlan/05-back-office.md` for the full task breakdown (E5-T1 through E5-T7).
+
+## Health-check cron activation (E5-T1 TODO)
+
+`.github/workflows/health-check-cron.yml` (E1-T4) is scaffolded but inert — it
+prints an informational message and exits green because no `HEALTH_CHECK_URL`
+repository variable is set yet. Once E5-T1 deploys the real `/api/health`
+endpoint, set the variable so the cron actually pings it:
+
+```
+gh variable set HEALTH_CHECK_URL --body <deployed-url>/api/health
+```
+
+(or via the GitHub UI: Settings → Secrets and variables → Actions →
+Variables). This is not a secret — use a repository **variable**, not a
+secret.

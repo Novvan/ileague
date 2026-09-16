@@ -1,0 +1,32 @@
+name: Health check cron
+
+# PRD Technical Risk #5 (see implementationPlan/RISK-MAP.md): Supabase's free
+# tier auto-pauses a project after 7 days with no API traffic. This daily ping
+# keeps services/back-office's Supabase project alive.
+#
+# Scaffolded by E1-T4 before there's anything real to ping. Stays a no-op
+# (green, informational) until E5-T1 ships the real Nitro /api/health
+# endpoint and sets the HEALTH_CHECK_URL repository variable — see
+# services/back-office/README.md.
+#
+# Must stay active until Supabase is upgraded off the free tier
+# (see implementationPlan/03-supabase-infra.md, E3-T5).
+
+on:
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report not-yet-configured
+        if: ${{ vars.HEALTH_CHECK_URL == '' }}
+        run: |
+          echo "HEALTH_CHECK_URL not yet configured -- back-office isn't deployed yet (see E5-T1). Skipping."
+
+      - name: Ping health-check endpoint
+        if: ${{ vars.HEALTH_CHECK_URL != '' }}
+        run: |
+          curl -f --silent --show-error "${{ vars.HEALTH_CHECK_URL }}"
