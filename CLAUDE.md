@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repo state
 
-This repository is pre-code. It currently contains only planning documents — no `package.json`, no `services/`, no build tooling, nothing to build/lint/test yet. Do not invent build/test commands; there are none. Once `implementationPlan/01-repo-bootstrap.md` (task E1-T1) is executed, this file should be updated with real commands and this notice removed.
+The services-first skeleton exists (`services/*/README.md`, `contracts/*/README.md`, `docs/adr/`, `scripts/`), but there is still no actual application code — no `package.json`, no build tooling, nothing to build/lint/test yet. Do not invent build/test commands; there are none. Each `services/<name>/README.md` states that service's scope and non-scope — read it before starting work in that directory. This notice should be removed once real app code and its build/test commands land.
 
-`git config claude.mode` is set to `solo` in this repo (no remote configured yet, single-developer project) — branch locally, merge your own work, no worktree/PR ritual required, per the global CLAUDE.md's "Branching" section.
+`git config claude.mode` is set to `solo` in this repo (single-developer project) — branch locally, merge your own work, no worktree/PR ritual required, per the global CLAUDE.md's "Branching" section. Remote: `git@github.com:Novvan/ileague.git`.
 
 ## Source of truth
 
