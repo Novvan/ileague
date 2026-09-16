@@ -1,6 +1,6 @@
 # Product Requirements Document: ILEAGUE
 
-**Status:** Draft v4 — MVP scope, infra/budget finalized for testing phase
+**Status:** Draft v5 — MVP scope, infra/budget finalized, implementation plan in `implementationPlan/`
 **Owner:** Ian Geier
 **Last updated:** 2026-09-16
 
@@ -64,7 +64,7 @@ Measured over the first quarter post-launch:
 - A player can reach their personal "next match" view (opponent, time, venue) in 2 taps or fewer from app launch.
 - Time-to-interactive is under 1.5 seconds on a throttled 3G-equivalent connection (Lighthouse mobile / Flutter DevTools timeline, tested on a mid-tier Android device).
 - Published bracket and news-bulletin updates are visible in the app within 2 seconds of the organizer's publish action (Supabase Realtime subscription, not polling).
-- Historical match results (past tournaments, final scores, winning team/deck where applicable) remain queryable indefinitely — the app never hard-deletes a completed tournament's results.
+- Historical match results (past tournaments, final scores, winning team/deck where applicable) remain queryable indefinitely for Organizer/League tiers — the app never hard-deletes a completed tournament's results, for any tier. **Free tier specifically:** results older than 90 days post-completion are archived out of the public read response (matching §5's pricing table) but the underlying data is never deleted; upgrading a league's tier un-archives its history. See §5's pricing table and §4's data retention policy for the full rule.
 
 **News bulletins**
 - Organizer can publish a bulletin from the Back Office; it appears on the Player App home feed for all players in that league without an app restart.
@@ -125,7 +125,7 @@ The auto-pause and no-PITR facts above directly affect the Security & Privacy re
 - Organizer accounts (email, auth credentials) are the only PII in the system, held by Supabase Auth; standard practice applies (hashed/managed by Supabase, never stored in plaintext by ILEAGUE's own code).
 - Draft-state bracket data is only readable by the authenticated organizer who owns the tournament — the public read API only ever serves `published` data, enforced via Postgres Row Level Security policies, not application-layer checks alone.
 - **Data retention policy (formal, in effect from MVP):**
-  - **Player/match data** (display names, results, standings, historical bracket data): retained indefinitely by design — this is the product's core value ("preserve historical records"). Not personal data under GDPR in the ordinary case (no account, no contact info, no way to link a display name back to a real identity through ILEAGUE), so it is not subject to erasure-request handling. An organizer can still request removal of a specific league's public data via support; fulfilled within 30 days, same SLA as below.
+  - **Player/match data** (display names, results, standings, historical bracket data): retained indefinitely by design, never hard-deleted for any tier — this is the product's core value ("preserve historical records"). Not personal data under GDPR in the ordinary case (no account, no contact info, no way to link a display name back to a real identity through ILEAGUE), so it is not subject to erasure-request handling. An organizer can still request removal of a specific league's public data via support; fulfilled within 30 days, same SLA as below. **Free-tier exception (§5):** results older than 90 days post-completion are archived — excluded from the public read API — but the rows are never deleted; upgrading the league's tier un-archives them immediately. This is a visibility limit, not a retention/deletion exception.
   - **Organizer account data** (email, auth credentials, billing info once tiers ship): retained for the lifetime of the account. On account deletion request, PII is purged from primary tables within 30 days. The organizer's published league/tournament data is *not* auto-deleted with the account (it stays live per the point above) unless the organizer explicitly requests full league removal in the same request.
   - **Backups:** during the free-tier testing phase (see Budget & Infra Tier above), Supabase provides **no automatic backups and no point-in-time recovery** — a deletion is final immediately, there is no backup copy for it to linger in. This also means there's no disaster-recovery safety net for the project itself until it's upgraded to Pro (which adds a 7-day daily-backup window and up to 14 days of PITR). That upgrade is a prerequisite before the retention/erasure SLA below can be considered fully backstopped — noted as a gap, not glossed over.
   - **Right-to-erasure posture:** built in from MVP even though the product doesn't yet target EU organizers specifically — cheaper to have the 30-day SLA and support-request flow in place now than to retrofit it once the org has EU customers.
@@ -143,7 +143,7 @@ Three tiers: one free, two paid, billed monthly (no per-event option). Tier boun
 | Players per tournament | Up to 32 | Up to 128 | Unlimited |
 | Tournament formats | All | All | All |
 | League admin seats | 1 (owner only) | Up to 3, realtime concurrent editing (v1.1) | Unlimited, role-based permissions (v2.0) |
-| Historical data retention | 90 days post-tournament (see retention policy, §4) | Indefinite | Indefinite + CSV/data export |
+| Historical data retention | 90 days post-tournament, then archived from public view — never deleted (see retention policy, §4) | Indefinite | Indefinite + CSV/data export |
 | Back Office branding | ILEAGUE branding shown | ILEAGUE branding shown | Custom league logo/branding |
 | Player App sponsor ads | Shown (default monetization) | Shown | Shown |
 | Support | Community/self-serve | Priority email | Priority email, faster SLA |
