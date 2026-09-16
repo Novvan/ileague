@@ -1,0 +1,11 @@
+# Real secrets, never committed. .env.example (the checked-in template with
+# placeholder values) is intentionally NOT ignored — see docs/SECRETS.md.
+.env
+
+node_modules/
+
+.DS_Store
+
+# Add stack-specific ignores (build/, .dart_tool/, .nuxt/, .vercel/, deno.lock
+# handling, etc.) here as each service's real tooling gets scaffolded — nothing
+# below this line yet because no such tooling exists in the repo today.
