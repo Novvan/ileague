@@ -6,7 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The services-first skeleton exists (`services/*/README.md`, `contracts/*/README.md`, `docs/adr/`, `scripts/`), but there is still no actual application code — no `package.json`, no build tooling, nothing to build/lint/test yet. Do not invent build/test commands; there are none. Each `services/<name>/README.md` states that service's scope and non-scope — read it before starting work in that directory. This notice should be removed once real app code and its build/test commands land.
 
-`git config claude.mode` is set to `solo` in this repo (single-developer project) — branch locally, merge your own work, no worktree/PR ritual required, per the global CLAUDE.md's "Branching" section. Remote: `git@github.com:Novvan/ileague.git`.
+`git config claude.mode` is set to `solo` in this repo (single-developer project, no worktree ritual needed) — **but PRs are used anyway, as an explicit exception to solo mode's default "no PR."** See "Workflow: stacked PRs" below. Remote: `git@github.com:Novvan/ileague.git`.
+
+## Workflow: stacked PRs
+
+Per Ian's instruction (2026-09-16): every task ships as its own branch and its own PR — no more direct-to-main commits, even in solo mode. When a task depends on another task that hasn't merged yet, its branch stacks on top of the dependency's branch instead of `main`, so the PR only shows the diff that task actually adds.
+
+Tooling: plain `git` + `gh` CLI (both already available), no Graphite/git-town — chosen explicitly over Graphite to avoid a new external tool/account for now.
+
+Convention:
+1. **Branch naming:** the task ID from `implementationPlan/`, e.g. `e4-t3-constraint-solver`.
+2. **Base branch:** `main` if nothing in the stack is still open; otherwise the branch of the still-open task this one depends on (per `implementationPlan/00-INDEX.md`'s dependency graph — check it before branching).
+3. **Open the PR** with `gh pr create --base <parent-branch>` — never omit `--base` once stacking, since `gh` defaults to the repo's default branch and would silently produce a non-stacked PR with the wrong diff.
+4. **Do not self-merge.** PRs are opened for Ian's review; merging is his call unless he says otherwise for a given PR.
+5. **When a lower PR in the stack merges,** retarget each child PR's base to the new bottom of the stack (`gh pr edit <child> --base <new-base>`) and rebase the child branch onto it — done by hand, not automated, since there's no stacking tool doing this for us.
 
 ## Source of truth
 
