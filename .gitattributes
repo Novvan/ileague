@@ -1,4 +1,6 @@
-# Hook scripts must always check out with LF line endings, regardless of a
-# contributor's core.autocrlf setting -- a CRLF shebang line ("#!/usr/bin/env
-# bash\r") fails with "bad interpreter" even under Git for Windows' bash.
+# Shell scripts (hooks included) must always check out with LF line endings,
+# regardless of a contributor's core.autocrlf setting -- a CRLF shebang line
+# ("#!/usr/bin/env bash\r") fails with "bad interpreter" even under Git for
+# Windows' bash.
 .githooks/* text eol=lf
+*.sh text eol=lf
