@@ -1,0 +1,10 @@
+# Standing decisions — don't re-litigate these
+
+Full rationale for #1-#5 is in `implementationPlan/00-INDEX.md`'s "Decisions made during planning" section and the epic file where each first applies (still accurate — these were product/technical calls, not layout-dependent). #6 is new as of the repo split.
+
+1. **`matches` table uses a single `status` enum** (`draft`/`published`) + `published_at` timestamp — not separate tables, not a version log.
+2. **Scheduling engine is a distinct, independently-tested unit**, not folded into the Back Office app's own code. Originally "its own service directory" in a single repo; now (per decision #6) a subdirectory with its own test runner inside `ileague-back-office`, for the same reason — its correctness bar (zero scheduling conflicts, ever) demands slow property-based tests that shouldn't gate every unrelated Nuxt UI change.
+3. **Bracket generation runs as a Supabase Edge Function, not a Vercel function** — Vercel Hobby's 10s execution cap has zero margin against the PRD's own `<10s` benchmark; Supabase Edge Functions give 150s on the free tier. The engine package must be Deno-compatible.
+4. **Organizer billing (Stripe or similar) is deferred past the testing phase.** Tier limits are defined and enforced now; payment collection is a named future task, not built in MVP.
+5. **Free-tier historical results: archived after 90 days, never deleted.** Archived data is excluded from the public read API but the rows persist; upgrading a league's tier un-archives them.
+6. **The product splits across three repos**, decided 2026-09-17: `ileague` (this hub — docs only), `ileague-back-office` (Nuxt/Nitro + the scheduling engine + Supabase infra, bundled because they're tightly coupled to one backend/Supabase project), `ileague-player-app` (Flutter, standalone). See `REPO_TOPOLOGY.md` for what goes where and the still-open question of how the API/Realtime contract crosses the repo boundary to the Player App — that part is explicitly not decided yet, don't assume an answer to it.
